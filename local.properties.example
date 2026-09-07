@@ -1,0 +1,4 @@
+# Copy this file to local.properties and update both values for your machine.
+sdk.dir=/path/to/Android/Sdk
+USAGE_API_URL=https://example.com/api/v1/status
+DEMO_MODE=false
