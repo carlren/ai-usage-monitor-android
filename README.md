@@ -63,9 +63,7 @@ The app reads only the documented display fields. Additional fields are ignored.
     "ok": true,
     "plan_type": "example",
     "credits": {
-      "balance": "250.00",
-      "approx_cloud_messages": [10, 50],
-      "approx_local_messages": [75, 300]
+      "balance": "250.00"
     },
     "primary_window": {
       "used_percent": 35,

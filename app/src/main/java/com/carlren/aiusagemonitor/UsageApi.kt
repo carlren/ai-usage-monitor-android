@@ -17,8 +17,6 @@ data class CodexUsage(
     val creditBalance: Double?,
     val primaryWindow: UsageWindow?,
     val secondaryWindow: UsageWindow?,
-    val cloudMessages: IntRange?,
-    val localMessages: IntRange?,
 )
 
 data class OpenRouterUsage(
@@ -89,12 +87,6 @@ object UsageApi {
                 creditBalance = creditsJson?.optString("balance")?.toDoubleOrNull(),
                 primaryWindow = codexJson.optJSONObject("primary_window")?.toUsageWindow(),
                 secondaryWindow = codexJson.optJSONObject("secondary_window")?.toUsageWindow(),
-                cloudMessages = creditsJson?.optJSONArray("approx_cloud_messages")?.let { array ->
-                    if (array.length() >= 2) array.optInt(0)..array.optInt(1) else null
-                },
-                localMessages = creditsJson?.optJSONArray("approx_local_messages")?.let { array ->
-                    if (array.length() >= 2) array.optInt(0)..array.optInt(1) else null
-                },
             ),
             openRouter = OpenRouterUsage(
                 ok = openRouterJson.optBoolean("ok", false),
@@ -135,8 +127,6 @@ object UsageApi {
                     usedPercent = 18,
                     resetAtEpochSeconds = now.plusDays(4).toEpochSecond(),
                 ),
-                cloudMessages = 10..50,
-                localMessages = 75..300,
             ),
             openRouter = OpenRouterUsage(
                 ok = true,

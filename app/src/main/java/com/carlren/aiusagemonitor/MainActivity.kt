@@ -288,55 +288,25 @@ private fun CodexCard(codex: CodexUsage, modifier: Modifier = Modifier) {
         healthy = codex.ok,
         modifier = modifier,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column {
-                Text(
-                    text = codex.creditBalance?.let(::formatCredits) ?: "—",
-                    color = TextPrimary,
-                    fontSize = 44.sp,
-                    lineHeight = 46.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-1).sp,
-                )
-                Text(
-                    text = "CREDITS AVAILABLE",
-                    color = TextSecondary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                codex.cloudMessages?.let { MessageEstimate("${it.first}–${it.last}", "CLOUD") }
-                Spacer(Modifier.height(10.dp))
-                codex.localMessages?.let { MessageEstimate("${it.first}–${it.last}", "LOCAL") }
-            }
-        }
+        Text(
+            text = codex.creditBalance?.let(::formatCredits) ?: "—",
+            color = TextPrimary,
+            fontSize = 48.sp,
+            lineHeight = 50.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = (-1).sp,
+        )
+        Text(
+            text = "CREDITS AVAILABLE",
+            color = TextSecondary,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+        )
         Spacer(Modifier.height(24.dp))
         codex.primaryWindow?.let { UsageBar("5-HOUR WINDOW", it) }
         Spacer(Modifier.height(22.dp))
         codex.secondaryWindow?.let { UsageBar("WEEKLY WINDOW", it) }
     }
-}
-
-@Composable
-private fun MessageEstimate(value: String, label: String) {
-    Text(
-        text = value,
-        color = TextPrimary,
-        fontSize = 21.sp,
-        lineHeight = 22.sp,
-        fontWeight = FontWeight.Bold,
-    )
-    Text(
-        text = "$label MESSAGES",
-        color = TextSecondary,
-        fontSize = 15.sp,
-        fontWeight = FontWeight.Bold,
-    )
 }
 
 @Composable
