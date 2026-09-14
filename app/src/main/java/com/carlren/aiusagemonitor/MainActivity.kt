@@ -1,6 +1,7 @@
 package com.carlren.aiusagemonitor
 
 import android.content.pm.ActivityInfo
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -78,6 +79,12 @@ private const val REFRESH_INTERVAL_MS = 60_000L
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val bridgeIntent = Intent(this, CadenceBridgeService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(bridgeIntent)
+        } else {
+            startService(bridgeIntent)
+        }
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         window.addFlags(
             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
@@ -97,7 +104,7 @@ class MainActivity : ComponentActivity() {
                     onSurface = TextPrimary,
                 ),
             ) {
-                UsageMonitorApp()
+                UsageMonitorApp(CadenceBridgeRuntime.state.value)
             }
         }
         window.decorView.post { enterImmersiveMode() }
@@ -129,7 +136,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun UsageMonitorApp() {
+private fun UsageMonitorApp(bridgeState: CadenceBridgeState) {
     var snapshot by remember { mutableStateOf<UsageSnapshot?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -168,6 +175,7 @@ private fun UsageMonitorApp() {
             DashboardHeader(
                 snapshot = snapshot,
                 loading = loading,
+                bridgeState = bridgeState,
                 onRefresh = { scope.launch { refresh() } },
             )
             Spacer(Modifier.height(10.dp))
@@ -193,6 +201,7 @@ private fun UsageMonitorApp() {
 private fun DashboardHeader(
     snapshot: UsageSnapshot?,
     loading: Boolean,
+    bridgeState: CadenceBridgeState,
     onRefresh: () -> Unit,
 ) {
     Row(
@@ -238,6 +247,9 @@ private fun DashboardHeader(
             }
         }
 
+        CadenceBridgeBadge(bridgeState)
+        Spacer(Modifier.width(12.dp))
+
         Button(
             onClick = onRefresh,
             enabled = !loading,
@@ -264,6 +276,38 @@ private fun DashboardHeader(
                 fontWeight = FontWeight.Bold,
             )
         }
+    }
+}
+
+@Composable
+private fun CadenceBridgeBadge(state: CadenceBridgeState) {
+    val statusColor = when {
+        state.zwiftConnected -> MetaGreen
+        state.relayConnected && state.advertising -> Warning
+        state.error != null -> Danger
+        else -> TextSecondary
+    }
+    Column(
+        horizontalAlignment = Alignment.End,
+    ) {
+        Text(
+            text = if (state.relayConnected) "${state.cadenceSpm} SPM" else "— SPM",
+            color = TextPrimary,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = when {
+                state.zwiftConnected -> "ZWIFT CONNECTED"
+                state.relayConnected && state.advertising -> "WAITING FOR ZWIFT"
+                state.advertising -> "WAITING FOR LINUX"
+                state.error != null -> "BRIDGE ERROR"
+                else -> "STARTING BRIDGE"
+            },
+            color = statusColor,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 

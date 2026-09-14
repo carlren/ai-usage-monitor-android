@@ -14,7 +14,6 @@ val configuredApiUrl = providers.gradleProperty("usageApiUrl").orNull
     ?: localProperties.getProperty("USAGE_API_URL", "")
 val configuredDemoMode = providers.gradleProperty("demoMode").orNull?.toBoolean()
     ?: localProperties.getProperty("DEMO_MODE", "false").toBoolean()
-
 fun String.asBuildConfigString(): String =
     "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
@@ -26,8 +25,8 @@ android {
         applicationId = "com.carlren.aiusagemonitor"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.1.1"
+        versionCode = 4
+        versionName = "1.2.0"
         buildConfigField("String", "USAGE_API_URL", configuredApiUrl.asBuildConfigString())
         buildConfigField("boolean", "DEMO_MODE", configuredDemoMode.toString())
     }

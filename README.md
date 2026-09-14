@@ -19,6 +19,7 @@ are included in this repository.
 - Retains the last successful reading when a refresh fails
 - Optional built-in demo mode for development and screenshots
 - No analytics, advertising SDKs, or embedded credentials
+- Always-on Zwift-compatible running cadence sensor backed by the authenticated VPS cadence API
 
 ## Requirements
 
@@ -45,6 +46,24 @@ DEMO_MODE=false
 put authentication tokens, passwords, or other secrets in it. Use an endpoint
 that is intentionally safe for the app to read, or add proper Android-compatible
 authentication before deployment.
+
+The cadence API uses a separate private configuration that is never compiled into
+the APK. Create a local file outside the repository:
+
+```properties
+CADENCE_API_URL=https://example.com/cadence-bridge/api
+CADENCE_API_TOKEN=replace-with-a-random-secret
+```
+
+Provision it once into the app's private storage over ADB:
+
+```bash
+adb exec-in "run-as com.carlren.aiusagemonitor sh -c 'cat > files/cadence.properties'" < /path/to/cadence.properties
+adb shell run-as com.carlren.aiusagemonitor chmod 600 files/cadence.properties
+```
+
+Restart the app after provisioning. The private configuration survives normal app
+updates and does not require the tablet to remain connected over USB.
 
 For a build that uses synthetic data and makes no network request:
 
@@ -106,6 +125,8 @@ edge to reveal the transient Android navigation controls.
   user IDs, account IDs, access tokens, filesystem paths, or raw upstream API
   responses.
 - The application does not persist API responses to disk.
+- The cadence bridge runs as a foreground service, starts after reboot, and publishes zero when the VPS feed is stale.
+- Cadence API credentials live only in Android private app storage and are never committed or compiled into the APK.
 - `FLAG_KEEP_SCREEN_ON` applies only while the app is visible. Pressing the power
   button or leaving the app returns control to the device's normal lock policy.
 
