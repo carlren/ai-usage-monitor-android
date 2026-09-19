@@ -5,13 +5,16 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.bluetooth.BluetoothAdapter
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 
 object CadenceBridgeRuntime {
@@ -26,11 +29,25 @@ class CadenceBridgeService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var bridge: CadenceBridge? = null
+    private val bluetoothStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1) == BluetoothAdapter.STATE_ON) {
+                Log.i("CadenceBridge", "Bluetooth restarted; rebuilding RSC advertiser")
+                bridge?.stop()
+                startBridge()
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, notification(CadenceBridgeRuntime.state.value))
+        registerReceiver(bluetoothStateReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
+        startBridge()
+    }
+
+    private fun startBridge() {
         bridge = CadenceBridge(applicationContext) { state ->
             handler.post {
                 CadenceBridgeRuntime.state.value = state
@@ -45,6 +62,7 @@ class CadenceBridgeService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        unregisterReceiver(bluetoothStateReceiver)
         bridge?.stop()
         bridge = null
         super.onDestroy()

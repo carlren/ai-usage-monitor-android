@@ -25,8 +25,8 @@ android {
         applicationId = "com.carlren.aiusagemonitor"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.2.0"
+        versionCode = 5
+        versionName = "1.2.1"
         buildConfigField("String", "USAGE_API_URL", configuredApiUrl.asBuildConfigString())
         buildConfigField("boolean", "DEMO_MODE", configuredDemoMode.toString())
     }

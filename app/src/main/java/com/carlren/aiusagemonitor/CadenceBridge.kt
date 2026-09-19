@@ -103,6 +103,7 @@ class CadenceBridge(
 
     @SuppressLint("MissingPermission")
     private fun startBluetoothServer() {
+        if (!running) return
         val bluetoothAdapter = adapter ?: return
         val advertiser = bluetoothAdapter.bluetoothLeAdvertiser
         if (advertiser == null) {
@@ -152,6 +153,7 @@ class CadenceBridge(
 
     @SuppressLint("MissingPermission")
     private fun startAdvertising() {
+        if (!running) return
         val advertiser = adapter?.bluetoothLeAdvertiser ?: return
         val callback = object : AdvertiseCallback() {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {

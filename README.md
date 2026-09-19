@@ -126,6 +126,7 @@ edge to reveal the transient Android navigation controls.
   responses.
 - The application does not persist API responses to disk.
 - The cadence bridge runs as a foreground service, starts after reboot, and publishes zero when the VPS feed is stale.
+- If Android restarts Bluetooth, the service automatically rebuilds its RSC sensor advertisement.
 - Cadence API credentials live only in Android private app storage and are never committed or compiled into the APK.
 - `FLAG_KEEP_SCREEN_ON` applies only while the app is visible. Pressing the power
   button or leaving the app returns control to the device's normal lock policy.
