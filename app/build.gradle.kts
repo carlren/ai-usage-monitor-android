@@ -25,8 +25,8 @@ android {
         applicationId = "com.carlren.aiusagemonitor"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.2.1"
+        versionCode = 7
+        versionName = "1.3.1"
         buildConfigField("String", "USAGE_API_URL", configuredApiUrl.asBuildConfigString())
         buildConfigField("boolean", "DEMO_MODE", configuredDemoMode.toString())
     }
@@ -58,4 +58,6 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }

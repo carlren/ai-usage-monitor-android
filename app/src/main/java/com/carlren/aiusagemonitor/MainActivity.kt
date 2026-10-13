@@ -47,10 +47,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -61,6 +64,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.roundToInt
 
 private val Background = Color(0xFF05070B)
 private val Surface = Color(0xFF111722)
@@ -73,17 +77,21 @@ private val RouterCyan = Color(0xFF62E0FF)
 private val MetaGreen = Color(0xFF70E0AD)
 private val Warning = Color(0xFFFFC857)
 private val Danger = Color(0xFFFF7B8B)
+private val BellevueZone = ZoneId.of("America/Los_Angeles")
 
 private const val REFRESH_INTERVAL_MS = 60_000L
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val bridgeIntent = Intent(this, CadenceBridgeService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(bridgeIntent)
-        } else {
-            startService(bridgeIntent)
+        val bridgeEnabled = filesDir.resolve("cadence.properties").isFile
+        if (bridgeEnabled) {
+            val bridgeIntent = Intent(this, CadenceBridgeService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(bridgeIntent)
+            } else {
+                startService(bridgeIntent)
+            }
         }
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         window.addFlags(
@@ -104,7 +112,7 @@ class MainActivity : ComponentActivity() {
                     onSurface = TextPrimary,
                 ),
             ) {
-                UsageMonitorApp(CadenceBridgeRuntime.state.value)
+                UsageMonitorApp(if (bridgeEnabled) CadenceBridgeRuntime.state.value else null)
             }
         }
         window.decorView.post { enterImmersiveMode() }
@@ -136,7 +144,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun UsageMonitorApp(bridgeState: CadenceBridgeState) {
+private fun UsageMonitorApp(bridgeState: CadenceBridgeState?) {
     var snapshot by remember { mutableStateOf<UsageSnapshot?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -148,6 +156,8 @@ private fun UsageMonitorApp(bridgeState: CadenceBridgeState) {
         try {
             snapshot = withContext(Dispatchers.IO) { UsageApi.fetch() }
             error = null
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (failure: Exception) {
             error = failure.message ?: "Unable to reach the usage service"
         } finally {
@@ -179,11 +189,7 @@ private fun UsageMonitorApp(bridgeState: CadenceBridgeState) {
                 onRefresh = { scope.launch { refresh() } },
             )
             Spacer(Modifier.height(10.dp))
-            if (snapshot == null) {
-                LoadingPanel(error = error, loading = loading)
-            } else {
-                Dashboard(snapshot = snapshot!!, modifier = Modifier.weight(1f))
-            }
+            Dashboard(snapshot, error, loading, modifier = Modifier.weight(1f))
         }
 
         if (error != null && snapshot != null) {
@@ -201,13 +207,13 @@ private fun UsageMonitorApp(bridgeState: CadenceBridgeState) {
 private fun DashboardHeader(
     snapshot: UsageSnapshot?,
     loading: Boolean,
-    bridgeState: CadenceBridgeState,
+    bridgeState: CadenceBridgeState?,
     onRefresh: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(66.dp),
+            .height(54.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -215,7 +221,7 @@ private fun DashboardHeader(
                 Text(
                     text = "AI USAGE",
                     color = TextPrimary,
-                    fontSize = 30.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                 )
                 Spacer(Modifier.width(14.dp))
@@ -233,7 +239,7 @@ private fun DashboardHeader(
                         else -> "CONNECTING"
                     },
                     color = if (BuildConfig.DEMO_MODE) Warning else if (snapshot != null) MetaGreen else Warning,
-                    fontSize = 16.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -247,8 +253,10 @@ private fun DashboardHeader(
             }
         }
 
-        CadenceBridgeBadge(bridgeState)
-        Spacer(Modifier.width(12.dp))
+        bridgeState?.let {
+            CadenceBridgeBadge(it)
+            Spacer(Modifier.width(12.dp))
+        }
 
         Button(
             onClick = onRefresh,
@@ -312,14 +320,118 @@ private fun CadenceBridgeBadge(state: CadenceBridgeState) {
 }
 
 @Composable
-private fun Dashboard(snapshot: UsageSnapshot, modifier: Modifier = Modifier) {
+private fun Dashboard(snapshot: UsageSnapshot?, error: String?, loading: Boolean, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        CodexCard(snapshot.codex, Modifier.weight(1.55f))
-        OpenRouterCard(snapshot.openRouter, Modifier.weight(1f))
-        MetaCard(snapshot.meta, Modifier.weight(1f))
+        ClockWeatherPanel(Modifier.weight(1.15f))
+        if (snapshot == null) {
+            LoadingPanel(error, loading, Modifier.weight(2.25f))
+        } else {
+            CodexCard(snapshot.codex, Modifier.weight(1.25f))
+            Column(
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OpenRouterCard(snapshot.openRouter, Modifier.weight(0.36f))
+                MetaCard(snapshot.meta, Modifier.weight(0.64f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClockWeatherPanel(modifier: Modifier = Modifier) {
+    var now by remember { mutableStateOf(Instant.now()) }
+    var weather by remember { mutableStateOf<WeatherSnapshot?>(null) }
+    var weatherFailed by remember { mutableStateOf(false) }
+    val clockFormat = remember { DateTimeFormatter.ofPattern("h:mm", Locale.US) }
+    val dateFormat = remember { DateTimeFormatter.ofPattern("EEEE, MMM d", Locale.US) }
+    val periodFormat = remember { DateTimeFormatter.ofPattern("a", Locale.US) }
+    val weatherTimeFormat = remember { DateTimeFormatter.ofPattern("h:mm a", Locale.US) }
+
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            now = Instant.now()
+            delay(1_000L)
+        }
+    }
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            try {
+                weather = withContext(Dispatchers.IO) { WeatherApi.fetch() }
+                weatherFailed = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                weatherFailed = true
+            }
+            delay(if (weatherFailed) REFRESH_INTERVAL_MS else 15 * REFRESH_INTERVAL_MS)
+        }
+    }
+
+    val localTime = now.atZone(BellevueZone)
+    Card(
+        modifier = modifier.fillMaxHeight(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Surface),
+    ) {
+        Column(Modifier.fillMaxSize().padding(20.dp)) {
+            Text("BELLEVUE, WA", color = RouterCyan, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(16.dp))
+            Text(
+                clockFormat.format(localTime), color = TextPrimary,
+                fontSize = 82.sp, lineHeight = 88.sp, fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace, letterSpacing = (-5).sp,
+            )
+            Text(
+                "${periodFormat.format(localTime)}  ·  ${localTime.zone.getDisplayName(java.time.format.TextStyle.SHORT, Locale.US)}",
+                color = TextSecondary, fontSize = 18.sp, fontWeight = FontWeight.Medium,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(dateFormat.format(localTime), color = TextPrimary, fontSize = 21.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.weight(1f))
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Track))
+            Spacer(Modifier.height(20.dp))
+            Text("CURRENT WEATHER", color = TextSecondary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            val reading = weather
+            if (reading == null) {
+                Spacer(Modifier.height(12.dp))
+                Text("— °C", color = TextPrimary, fontSize = 48.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    if (weatherFailed) "Weather unavailable" else "Loading weather…",
+                    color = if (weatherFailed) Warning else TextSecondary, fontSize = 18.sp,
+                )
+                Text("Retries automatically", color = TextSecondary, fontSize = 14.sp)
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text("${reading.temperature.roundToInt()}°", color = TextPrimary, fontSize = 54.sp, fontWeight = FontWeight.Bold)
+                        Text("C", color = TextSecondary, fontSize = 24.sp, modifier = Modifier.padding(bottom = 10.dp))
+                    }
+                    Text(reading.icon, fontSize = 52.sp, modifier = Modifier.clearAndSetSemantics {})
+                }
+                Text(reading.condition, color = TextPrimary, fontSize = 21.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "Feels ${reading.feelsLike.roundToInt()}°C  ·  Wind ${reading.windMph.roundToInt()} mph",
+                    color = TextSecondary, fontSize = 16.sp,
+                )
+                Spacer(Modifier.height(12.dp))
+                val stale = weatherFailed || reading.isStale(now)
+                Text(
+                    "${if (stale) "Last reading" else "As of"} ${weatherTimeFormat.format(reading.observedAt.atZone(BellevueZone))}",
+                    color = if (stale) Warning else TextSecondary, fontSize = 14.sp,
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Text("Weather: Open-Meteo", color = TextSecondary, fontSize = 12.sp)
+        }
     }
 }
 
@@ -355,11 +467,6 @@ private fun CodexCard(codex: CodexUsage, modifier: Modifier = Modifier) {
 
 @Composable
 private fun OpenRouterCard(usage: OpenRouterUsage, modifier: Modifier = Modifier) {
-    val remainingPercent = if (usage.totalCredits > 0) {
-        ((usage.remaining / usage.totalCredits) * 100).toInt().coerceIn(0, 100)
-    } else 0
-    val statusColor = remainingColor(remainingPercent)
-
     ProviderCard(
         title = "OpenRouter",
         status = if (usage.ok) "LIVE" else "ISSUE",
@@ -381,19 +488,6 @@ private fun OpenRouterCard(usage: OpenRouterUsage, modifier: Modifier = Modifier
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
         )
-        Spacer(Modifier.height(28.dp))
-        StatRow("Used", formatCurrency(usage.totalUsage))
-        Spacer(Modifier.height(14.dp))
-        StatRow("Starting total", formatCurrency(usage.totalCredits))
-        Spacer(Modifier.height(28.dp))
-        Text(
-            text = "$remainingPercent% LEFT",
-            color = statusColor,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.height(10.dp))
-        HighContrastProgress(remainingPercent / 100f, statusColor)
     }
 }
 
@@ -421,24 +515,12 @@ private fun MetaCard(usage: MetaUsage, modifier: Modifier = Modifier) {
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
         )
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(18.dp))
         StatRow("Free credits", formatCurrency(usage.freeCredits))
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(10.dp))
         StatRow("Balance", formatCurrency(usage.balance))
-        Spacer(Modifier.height(32.dp))
-        Text(
-            text = "LAST META SYNC",
-            color = TextSecondary,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.height(5.dp))
-        Text(
-            text = usage.updatedAt?.let(::formatIsoTime) ?: "Not available",
-            color = MetaGreen,
-            fontSize = 21.sp,
-            fontWeight = FontWeight.Bold,
-        )
+        Spacer(Modifier.height(18.dp))
+        StatRow("Last sync", usage.updatedAt?.let(::formatIsoTime) ?: "Not available")
     }
 }
 
@@ -457,7 +539,7 @@ private fun ProviderCard(
         border = BorderStroke(2.dp, accent.copy(alpha = 0.78f)),
         colors = CardDefaults.cardColors(containerColor = Surface),
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -473,18 +555,18 @@ private fun ProviderCard(
                 Text(
                     text = title,
                     color = TextPrimary,
-                    fontSize = 25.sp,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
                     text = status,
                     color = if (healthy) accent else Danger,
-                    fontSize = 15.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(18.dp))
             content()
         }
     }
@@ -497,17 +579,9 @@ private fun UsageBar(label: String, window: UsageWindow) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Bottom,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column {
-            Text(label, color = TextSecondary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            Text(
-                text = "Resets ${formatEpochTime(window.resetAtEpochSeconds)}",
-                color = TextSecondary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-            )
-        }
+        Text(label, color = TextSecondary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         Text(
             text = "$remaining% LEFT",
             color = color,
@@ -515,6 +589,10 @@ private fun UsageBar(label: String, window: UsageWindow) {
             fontWeight = FontWeight.Bold,
         )
     }
+    Text(
+        text = "Resets ${formatEpochTime(window.resetAtEpochSeconds)}",
+        color = TextSecondary, fontSize = 15.sp, fontWeight = FontWeight.Medium,
+    )
     Spacer(Modifier.height(9.dp))
     HighContrastProgress(remaining / 100f, color)
 }
@@ -545,8 +623,8 @@ private fun StatRow(label: String, value: String) {
 }
 
 @Composable
-private fun LoadingPanel(error: String?, loading: Boolean) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+private fun LoadingPanel(error: String?, loading: Boolean, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxHeight(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             if (loading) {
                 CircularProgressIndicator(

@@ -109,6 +109,7 @@ class CadenceBridgeService : Service() {
 class CadenceBridgeBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != Intent.ACTION_BOOT_COMPLETED) return
+        if (!context.filesDir.resolve("cadence.properties").isFile) return
         val serviceIntent = Intent(context, CadenceBridgeService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(serviceIntent)

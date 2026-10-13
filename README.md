@@ -11,12 +11,15 @@ are included in this repository.
 
 ## Features
 
-- Three side-by-side provider panels with large, readable typography
+- Large Pacific-time digital clock and date alongside current Bellevue, WA weather
+- Codex panel plus a shared column with OpenRouter's remaining balance and all Meta details
 - Rolling usage windows, reset times, credit balances, and spend summaries
 - Automatic refresh every minute and an on-demand refresh button
 - Immersive edge-to-edge landscape mode with no scrolling
 - Keeps the display awake while the dashboard is in the foreground
 - Retains the last successful reading when a refresh fails
+- Weather refreshes every 15 minutes independently of usage, retries every minute
+  after failures, and labels old readings rather than presenting them as current
 - Optional built-in demo mode for development and screenshots
 - No analytics, advertising SDKs, or embedded credentials
 - Always-on Zwift-compatible running cadence sensor backed by the authenticated VPS cadence API
@@ -64,6 +67,14 @@ adb shell run-as com.carlren.aiusagemonitor chmod 600 files/cadence.properties
 
 Restart the app after provisioning. The private configuration survives normal app
 updates and does not require the tablet to remain connected over USB.
+The cadence service and its status badge are enabled only on devices with this
+private configuration.
+
+Weather uses [Open-Meteo](https://open-meteo.com/en/docs) current conditions for
+fixed Bellevue coordinates, in Celsius and mph, with condition icons (sun/moon,
+clouds, fog, rain, snow, and thunderstorms). No API key or device location
+permission is needed. The clock continues to work offline; weather and usage
+retain their last readings while the app remains open.
 
 For a build that uses synthetic data and makes no network request:
 
@@ -114,6 +125,8 @@ The app reads only the documented display fields. Additional fields are ignored.
 ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
+
+Run weather parsing and stale-reading checks with `./gradlew testDebugUnitTest`.
 
 The app forces landscape orientation and hides the system bars. Swipe from an
 edge to reveal the transient Android navigation controls.
